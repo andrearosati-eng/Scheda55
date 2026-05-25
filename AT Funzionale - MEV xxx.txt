@@ -1,0 +1,124 @@
+    Specifiche Tecniche - Funzionali
+  Nuove Regole OPI (Scheda 55) 
+
+					
+Revisione del Documento: 02
+Data Revisione: 21-05-2026
+
+StrutturaNome e CognomeFirma – PAdESRedazione ENG SAP – PA Andrea RosatiVerifica
+Approvazione
+
+	
+
+
+RevisioneDataSintesi delle Modifiche0104/11/2025Prima emissione documento 
+Limiti di utilizzo del documentoIn base alla classificazione del documento.Indice
+1.	Introduzione	3
+1.1	Scopo del Documento	3
+1.2	Acronimi	3
+1.3	Documenti di riferimento	3
+2.	Requisiti implementativi	4
+3.	Funzionalità	5
+3.1	Nella transazione di creazione Liquidazione (report ZFM_GESTIONE_LIQUIDAZIONI)	5
+3.2	Creazione Massiva da PC, Creazione da BES	6
+
+
+1. Introduzione
+La soluzione proposta mira a fruire del l servizio di Verifica del Beneficiario (VoP - Verification of Payee) erogato dalla Banca Tesoriera in conformità con gli Standard OPI.
+L’Ente deve richiedere, sulla base di specifica istruzione all’interno dell’ordinativo, quale tipo di controllo intende far eseguire.
+1.1 Scopo del Documento
+Lo scopo del documento è illustrare gli interventi utili al popolamento degli OPI in modo da indicare la tipologia di controllo che vuole essere effettuata sulla modalità di pagamento con bonifici SEPA ordinari e istantanei.
+1.2 Acronimi
+NomeDescrizione1.3 Documenti di riferimento
+Codice del DocumentoDocumento[1][2][3]
+
+
+
+
+2. Requisiti implementativi
+Le modifiche agli standard OPI intervenute tramite la Scheda 55 e alle scelte effettuate dall’Ente sull’applicazione delle tipologie di controllo sui pagamenti tramite con bonifici SEPA ordinari e istantanei.
+
+
+3. Funzionalità
+In creazione/modifica Mandato per Pagamenti “SEPA CREDIT TRANSFER” e 
+“SEPA INSTANT CREDIT TRANSFER” ossia bonifici ordinari e istantanei deve essere prevista la valorizzazione dei due nuovi campi atti idonei alla modalità di verifica che si vuole far effettuare.
+ 
+Conseguentemente nella generazione l’Opi del mandato o meglio nel popolamento delle cosiddette tabelle Ponte (SIANEXT) bisogna gestire le nuove informazioni.
+Dovranno essere creati i nuovi campi DDIC:
+
+Campi VoP
+* verifica_beneficiario char 14 
+dominio: 
+      “ “
+       “SI”-“ esatta corrispondenza”
+      ” SI CLOSE MATCH”-“ parziale corrispondenza”
+      ”NO” – “Nessun Controllo”
+* id_ beneficiario_pg char 40 
+
+
+Dovranno essere Modificate le seguenti strutture Tabellari inserendo i campi VoP:
+* ZFM_MAND_T
+* ZMEL_DOCU_DETAIL
+
+
+Campi identificativo_category_purpose
+* Code char 4 
+Dominio “SALA”, “PENS”.
+* Proprietary char 35.
+
+
+Dovranno essere Modificate per i campi identificativo_category_purpose
+
+* ZMEL_DOCU_DETAIL
+
+Dovranno quindi essere adeguati i seguenti programmi:
+* Visualizzazione, Creazione e Modifica Mandato
+* Cambio Stato Pagina Contabile
+* Generazione OPI (popolamento tabelle Ponte)
+
+3.1 Creazione/Modifica Mandato 
+(report ZFM_MANDATO)
+Bisogna aggiungere un nuovo tasto Funzionale “VoP” nella toolbar
+
+
+Questa nuova funzionalità deve richiamare una Popup
+Composta dai due nuovi campi Verifica Beneficiario (verifica_beneficiario) e Id.Beneficiario( Benid_ beneficiario_pg).
+Verifica Beneficiario deve avere match code sul dominio riportando anche la descrizione.
+Id Beneficario è editabile solo se Viene scelto “SI” in Verifica Beneficiario e il codice Beneficiario del mandato (CODICE_BEN_ALT) in elaborazione NON è una persona Fisica(BUT000-BU_GROUP diverso da ZI03 accedendo per PARTNER= CODICE_BEN_ALT).
+N.B. anche se il mandato avesse più righe di dettaglio il codice del beneficiario (sarebbe sempre il medesimo. 
+
+I due campi sono editabili solo in modifica e creazione.
+In caso di Visualizzazione e modifica i suddetti campi sono reperiti dai rispettivi valori presenti in ZFM_MAND_T.
+Al salvataggio vanno aggiornati i dati in tabella.
+
+3.2 Cambio Stato Pagina Contabile
+ (FM ZFM_CAMBIO_STATO_PC)
+All’operazione di rendi definitivo “D” all’atto della creazione del mandato ( FORM crea_mandato) va impostato il nuovo campo
+verifica_beneficiario a “SI” (Creare una form dedicata alla valorizzazione dei campi VoP nella parte di valorizzazione della testa ZFM_MAND_T) .
+
+3.3 Generazione OPI (popolamento tabelle Ponte)
+La funzione di “Genera OPI” presente nel cruscotto dei Mandati Emessi,
+richiama tramite odata il report “ZSF_LISTE_EWS_M”.
+Nel report “ZSF_LISTE_EWS_M”.
+
+La tabella interessata è ZMEL_DOCU_DETAIL.
+Nel caso in cui la modalità di pagamento è “B” – Bonifico allora bisogna valorizzare anche i campi VoP della ZMEL_DOCU_DETAIL con quelli presenti nella ZFM_MAND_T.
+
+Nel caso di valorizzazione del set HR_NEW e il tipo liquidazione sia P (ZFM_LIQ_T-TIPO_LIQ) allora bisogna valorizzare con “SALA” il nuovo campo CODE della ZMEL_DOCU_DETAIL.
+
+
+
+
+ ARIA S.p.A.					Classificazione: A circolazione limitata
+
+Pagina 10 di 10
+
+
+
+				Classificazione: A circolazione limitata
+
+
+Pagina 1 di 10
+
+
+
