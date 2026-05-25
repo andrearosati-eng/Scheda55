@@ -1,0 +1,167 @@
+*&---------------------------------------------------------------------*
+*& Include          ZSF_LISTE_EWS_F01
+*&---------------------------------------------------------------------*
+*----------------------------------------------------------------------*
+***INCLUDE ZSF_LISTE_EWS_F01.
+*----------------------------------------------------------------------*
+*&---------------------------------------------------------------------*
+*&      Form  TROVA_DOC
+*&---------------------------------------------------------------------*
+*       text
+*----------------------------------------------------------------------*
+*      -->P_<LIQ>_GJAHR_PRE  text
+*      -->P_<LIQ>_NUM_PRE  text
+*      -->P_<LIQ>_UM_RIGA  text
+*      <--P_<LIQ>_AA_DOC_FI  text
+*      <--P_<LIQ>_NUM_DOC_MM  text
+*----------------------------------------------------------------------*
+FORM trova_doc  USING    gjahr_pre
+                         num_pre
+                         num_riga
+                CHANGING aa_doc
+                         num_doc.
+
+*  SELECT SINGLE gjahr_doc  nr_doc_coll INTO (aa_doc, num_doc)
+*    FROM zfmpreac_fat_doc
+*    WHERE   gjahr EQ gjahr_pre AND
+*            num_pre EQ  num_pre AND
+*            num_riga EQ num_riga.
+ENDFORM.                    " TROVA_DOC
+
+*&---------------------------------------------------------------------*
+*& Form fill_zmel_fatture
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+FORM fill_zmel_fatture  USING    p_fat_new STRUCTURE zfmpreac_fat_new
+
+                        CHANGING p_zmel_fatture STRUCTURE zmel_fatture.
+
+  DATA: lv_data TYPE datum.
+
+* CODICE_IPA_ENTE_SIOPE
+  p_zmel_fatture-codice_ipa_ente_siope = p_fat_new-cod_ipa.
+  IF p_fat_new-origine EQ 'M' OR
+     ( p_fat_new-origine EQ 'E' AND p_fat_new-cod_ipa EQ space ).
+    p_zmel_fatture-codice_ipa_ente_siope = gv_cod_ente.
+  ENDIF.
+* TIPO_DOCUMENTO_SIOPE_E
+  IF p_fat_new-origine = 'E'.
+    p_zmel_fatture-tipo_documento_siope_e = 'ELETTRONICO'.
+  ENDIF.
+* TIPO_DOCUMENTO_SIOPE_A
+  IF p_fat_new-origine = 'M'.
+    p_zmel_fatture-tipo_documento_siope_a = 'ANALOGICO'.
+  ENDIF.
+* TIPO_DOCUMENTO_ANALOGICO_SIOPE
+  IF p_fat_new-origine = 'M'.
+    p_zmel_fatture-tipo_documento_analogico_siope = 'ANALOGICO'.
+  ENDIF.
+* IDENTIFICATIVO_LOTTO_SDI_SIOPE
+  p_zmel_fatture-identificativo_lotto_sdi_siope = p_fat_new-identificativo_sdi.
+* NUMERO_FATTURA_SIOPE
+  p_zmel_fatture-numero_fattura_siope = p_fat_new-xblnr.
+* DATA_SCADENZA_PAGAM_SIOPE
+  lv_data = p_fat_new-zfbdt + p_fat_new-gg_scad.
+  p_zmel_fatture-data_scadenza_pagam_siope = lv_data.
+
+* MOTIVO SCADENZA SIOPE
+  IF p_zmel_fatture-data_scadenza_pagam_siope NE p_fat_new-zzdata_scad_pagam_siope
+*     AND p_fat_new-cpudt_sosp IS INITIAL."arosati 14.08.2025
+    AND p_fat_new-gg_sosp eq 0.
+    p_zmel_fatture-motivo_scadenza_siope = 'CORRETTA_SCAD_FATTURA'.
+
+  ELSEIF p_zmel_fatture-data_scadenza_pagam_siope NE p_fat_new-zzdata_scad_pagam_siope
+*     AND p_fat_new-cpudt_sosp IS NOT INITIAL."arosati 14.08.2025
+      AND p_fat_new-gg_sosp gt 0.
+    p_zmel_fatture-motivo_scadenza_siope = 'SOSP_DECORRENZA_TERMINI'.
+
+  ELSE.
+    p_zmel_fatture-motivo_scadenza_siope = 'SCAD_FATTURA'.
+  ENDIF.
+
+* NATURA_SPESA_SIOPE
+*  Se il campo zz_titolo della fmci è 1 o 7 “corrente”
+*  se 2 “capitale” e lo inserisce nella zmel_document_DETAIL
+*    IF v_titolo EQ '1' OR v_titolo EQ '7'.
+*      p_zmel_fatture-natura_spese_siope = 'CORRENTE'.
+*    ENDIF.
+*    IF v_titolo EQ '2'.
+*      p_zmel_fatture-natura_spese_siope = 'CAPITALE'.
+*    ENDIF.
+ENDFORM.
+
+*&---------------------------------------------------------------------*
+*& Form calcola_progr_record_fattura
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+FORM calcola_progr_record_fattura  using  p_impo TYPE with_item-wt_qbshh CHANGING p_progressivo_record_fattura.
+
+* check ritrasmissione o nuovo invio
+  SELECT * FROM zmel_fatture UP TO 1 ROWS            "#EC CI_SEL_NESTED
+    INTO @DATA(ls_zmel_fatture)               "#EC CI_ALL_FIELDS_NEEDED
+    WHERE  codice_ente               = @gs_zmel_fatture-codice_ente
+    AND    esercizio                 = @gs_zmel_fatture-esercizio
+    AND    tipo_ordinativo           = @gs_zmel_fatture-tipo_ordinativo
+    AND    numero_ordinativo         = @gs_zmel_fatture-numero_ordinativo
+    AND    progressivo_beneficiario  = @gs_zmel_fatture-progressivo_beneficiario
+    AND    importo_siope             = @gs_zmel_fatture-importo_siope
+*    AND    importo_siope             = @p_impo
+
+    AND    identificativo_lotto_sdi_siope = @gs_zmel_fatture-identificativo_lotto_sdi_siope
+    ORDER BY PRIMARY KEY      .
+  ENDSELECT.
+
+  IF sy-subrc EQ 0.
+* no read range progressivo
+*    gs_zmel_fatture-progressivo_record_fattura =  p_progressivo_record_fattura.
+     gs_zmel_fatture-progressivo_record_fattura =  ls_zmel_fatture-progressivo_record_fattura."arosati 21.10.2024
+
+
+  ELSE.
+    CLEAR gs_zmel_fatture-progressivo_record_fattura .
+    PERFORM get_prg_record_fattura USING '01'
+                                         'Z_MEL_FATT'
+                                         '1000'
+                                          gs_zmel_document-gjahr
+                                          CHANGING
+                                          p_progressivo_record_fattura.
+  ENDIF.
+
+ENDFORM.
+*&---------------------------------------------------------------------*
+*& Form cambia_name1
+*&---------------------------------------------------------------------*
+*& text
+*&---------------------------------------------------------------------*
+*&      --> LS_LFA1_LIFNR
+*&      <-- GS_ZMEL_DOCU_DETAIL_NAME1
+*&---------------------------------------------------------------------*
+FORM cambia_name1  USING    p_ls_lfa1_lifnr
+                   CHANGING p_gs_zmel_docu_detail_name1.
+SELECT SINGLE name_first,                      "#EC CI_SROFC_NESTED
+                  name_last,
+                  name_org1,
+                  name_org2,
+                  name_org3,
+                  name_org4,
+                  denominazione
+      FROM but000
+      INTO @DATA(ls_name)
+     WHERE partner EQ @p_ls_lfa1_lifnr.
+    IF sy-subrc IS INITIAL.
+      IF ls_name-name_org1 IS NOT INITIAL.
+        CONCATENATE ls_name-name_org1 ls_name-name_org2
+                    ls_name-name_org3 ls_name-name_org4
+               INTO p_gs_zmel_docu_detail_name1.
+        CONDENSE p_gs_zmel_docu_detail_name1.
+      ELSEIF ls_name-denominazione IS INITIAL.
+        CONCATENATE ls_name-name_first ls_name-name_last
+               INTO p_gs_zmel_docu_detail_name1 SEPARATED BY space.
+        CONDENSE p_gs_zmel_docu_detail_name1.
+      ELSE.
+        p_gs_zmel_docu_detail_name1 = ls_name-denominazione.
+      ENDIF.
+    ENDIF.
+ENDFORM.
